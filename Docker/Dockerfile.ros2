@@ -52,15 +52,6 @@ RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o 
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
-# 3. Global Build of CycloneDDS 0.10.x
-# ---------------------------------------------------------------------------
-# Building and overriding the default library allows standard RMW to use 0.10.x features natively
-RUN git clone https://github.com/eclipse-cyclonedds/cyclonedds -b releases/0.10.x /tmp/cyclonedds \
-    && cmake -S /tmp/cyclonedds -B /tmp/cyclonedds/build -DCMAKE_INSTALL_PREFIX=/usr/local \
-    && cmake --build /tmp/cyclonedds/build --target install --parallel "$(( $(nproc) / 4 > 0 ? $(nproc) / 4 : 1 ))" \
-    && rm -rf /tmp/cyclonedds
-
-# ---------------------------------------------------------------------------
 # 4. Environment Setup
 # ---------------------------------------------------------------------------
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /etc/bash.bashrc
@@ -70,9 +61,6 @@ ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 # Swap default middleware to CycloneDDS
 ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-
-# Mount config/cyclonedds.xml from the host at /config to override this path.
-ENV CYCLONEDDS_URI=/config/cyclonedds.xml
 
 ENV ROS_DISTRO=${ROS_DISTRO}
 SHELL ["/bin/bash", "-c"]

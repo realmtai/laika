@@ -1,0 +1,34 @@
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    ROS_DISTRO=foxy
+
+# 1. Install system prerequisites and add the official ROS 2 repository
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg2 \
+    lsb-release \
+    software-properties-common \
+    git \
+    vim \
+    wget && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/ros2.list && \
+    rm -rf /var/lib/apt/lists/*
+
+# 2. Install ROS 2 Desktop, CycloneDDS, and building tools in a single layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-${ROS_DISTRO}-desktop \
+    ros-foxy-rmw-cyclonedds-cpp \
+    ros-foxy-rosidl-generator-dds-idl \
+    python3-colcon-common-extensions \
+    cmake \
+    g++ \
+    build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+# 3. Automatically source ROS 2 environments on terminal startup
+RUN echo "source /opt/ros/foxy/setup.bash" >> ~/.bashrc
+
+WORKDIR /workspace
+CMD ["bash"]
