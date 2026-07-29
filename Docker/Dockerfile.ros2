@@ -1,69 +1,53 @@
-# syntax=docker/dockerfile:1
+FROM ubuntu:20.04
 
-# sudo docker build -f Dockerfile.ros2 -t ros2-foxy .
+ENV DEBIAN_FRONTEND=noninteractive \
+    ROS_DISTRO=foxy
 
-# Example Run:
-#   sudo docker run --rm -it \
-#    -v "$(pwd)/config:/config" \
-#    --network host \
-#    ros2-foxy
-
-# ROS 2 Foxy Fitzroy targets Ubuntu 20.04 (Focal Fossa)
-ARG UBUNTU_VERSION=20.04
-FROM ubuntu:${UBUNTU_VERSION}
-
-# Avoid interactive prompts during apt installs
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Which ROS 2 distro to install
-ARG ROS_DISTRO=foxy
-# "desktop" or "ros-base"
-ARG ROS_INSTALL_TYPE=desktop
-
-# ---------------------------------------------------------------------------
-# 1. System Setup (Locale, Basic Prerequisites, & Universe Repository)
-# ---------------------------------------------------------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        locales \
-        curl \
-        software-properties-common \
-    && locale-gen en_US en_US.UTF-8 \
-    && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 \
-    && add-apt-repository universe \
-    && rm -rf /var/lib/apt/lists/*
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US:en \
-    LC_ALL=en_US.UTF-8
-
-# ---------------------------------------------------------------------------
-# 2. Add ROS 2 Repository & Install ROS 2, Autocomplete, & Dev Tools
-# ---------------------------------------------------------------------------
-RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo ${UBUNTU_CODENAME:-$VERSION_CODENAME}) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null \
-    && apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
-        ros-${ROS_DISTRO}-${ROS_INSTALL_TYPE} \
-        ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
-        python3-argcomplete \
-        ros-dev-tools \
-        git \
-        cmake \
-        build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# ---------------------------------------------------------------------------
-# 4. Environment Setup
-# ---------------------------------------------------------------------------
-RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /etc/bash.bashrc
-
-# Ensure system looks at /usr/local/lib first for the new Cyclone 0.10.x binary
-ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-
-# Swap default middleware to CycloneDDS
-ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-
-ENV ROS_DISTRO=${ROS_DISTRO}
+# `source` is a bash builtin, needed by the workspace build below
 SHELL ["/bin/bash", "-c"]
 
-WORKDIR /root
-CMD ["/bin/bash"]
+# 1. Install system prerequisites and add the official ROS 2 repository
+# https://docs.ros.org/en/foxy/Installation/Ubuntu-Install-Debians.html
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg2 \
+    lsb-release \
+    software-properties-common \
+    locales \
+    git \
+    vim \
+    wget && \
+    locale-gen en_US en_US.UTF-8 && \
+    update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/ros2.list && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV LANG=en_US.UTF-8
+
+# 2. Install ROS 2 Desktop, CycloneDDS, and building tools in a single layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-${ROS_DISTRO}-desktop \
+    ros-foxy-rmw-cyclonedds-cpp \
+    ros-foxy-rosidl-generator-dds-idl \
+    python3-colcon-common-extensions \
+    libyaml-cpp-dev \
+    cmake \
+    g++ \
+    build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+# 3. Build the Unitree ROS 2 workspace against CycloneDDS 0.10.x
+# https://github.com/unitreerobotics/unitree_ros2/blob/master/README.md
+RUN git clone https://github.com/unitreerobotics/unitree_ros2 /root/unitree_ros2 && \
+    cd /root/unitree_ros2/cyclonedds_ws/src && \
+    git clone https://github.com/ros2/rmw_cyclonedds -b ${ROS_DISTRO} && \
+    git clone https://github.com/eclipse-cyclonedds/cyclonedds -b releases/0.10.x && \
+    cd .. && \
+    export LD_LIBRARY_PATH=/opt/ros/${ROS_DISTRO}/lib && \
+    colcon build --packages-select cyclonedds && \
+    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    colcon build
+
+WORKDIR /workspace
+CMD ["bash"]
