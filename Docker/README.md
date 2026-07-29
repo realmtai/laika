@@ -25,6 +25,10 @@ The `config/` directory is mounted into the container at `/config`, and
 `CYCLONEDDS_URI` already points at `/config/cyclonedds.xml`, so changes take
 effect on the next `docker run` without a rebuild.
 
+Keep the `-v "$(pwd)/config:/config"` mount on every run — without it
+`CYCLONEDDS_URI` resolves to a file that does not exist and DDS fails to
+initialise.
+
 ## Build
 
 ```bash
