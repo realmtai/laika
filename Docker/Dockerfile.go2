@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 FROM ros:foxy
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -50,7 +48,8 @@ RUN mkdir -p /root/unitree_ros2/cyclonedds_ws/src && \
 
 ENV CYCLONEDDS_HOME=/root/unitree_ros2/cyclonedds_ws/install
 
-RUN pip3 install -e /opt/unitree/unitree_sdk2_python
+RUN echo "source $CYCLONEDDS_URI/setup.bash" && \
+    pip3 install -e /opt/unitree/unitree_sdk2_python
 
 RUN cmake -S /opt/unitree/unitree_sdk2 \
           -B /opt/unitree/unitree_sdk2/build \
@@ -59,9 +58,11 @@ RUN cmake -S /opt/unitree/unitree_sdk2 \
     cmake --install /opt/unitree/unitree_sdk2/build
 
 RUN echo "source /opt/ros/foxy/setup.bash" >> /etc/bash.bashrc && \
-    echo "source /opt/unitree/unitree_ros2/cyclonedds_ws/install/setup.bash" >> /etc/bash.bashrc
+    echo "source $CYCLONEDDS_HOME/setup.bash" >> /etc/bash.bashrc
+
 ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ENV CYCLONEDDS_URI=/config/cyclonedds.xml
 
 WORKDIR /root
 CMD ["bash"]
+
