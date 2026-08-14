@@ -48,7 +48,7 @@ RUN mkdir -p /root/unitree_ros2/cyclonedds_ws/src && \
 
 ENV CYCLONEDDS_HOME=/root/unitree_ros2/cyclonedds_ws/install
 
-RUN echo "source $CYCLONEDDS_URI/setup.bash" && \
+RUN echo "source $CYCLONEDDS_HOME/setup.bash" && \
     pip3 install -e /opt/unitree/unitree_sdk2_python
 
 RUN cmake -S /opt/unitree/unitree_sdk2 \
