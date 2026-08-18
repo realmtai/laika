@@ -58,9 +58,10 @@ RUN cmake -S /opt/unitree/unitree_sdk2 \
     cmake --build /opt/unitree/unitree_sdk2/build --parallel "$(( $(nproc) / 4 > 0 ? $(nproc) / 4 : 1 ))" && \
     cmake --install /opt/unitree/unitree_sdk2/build
 
-RUN source $CYCLONEDDS_HOME/setup.bash && \
-    source /opt/ros/foxy/setup.bash && \
-    pip3 install -e /opt/unitree/unitree_sdk2_python
+# Running into issues with this, commenting it out for now and it can be ran manually in the container
+# RUN source $CYCLONEDDS_HOME/setup.bash && \
+#   source /opt/ros/foxy/setup.bash && \
+#   pip3 install -e /opt/unitree/unitree_sdk2_python
 
 RUN echo "source /opt/ros/foxy/setup.bash" >> /etc/bash.bashrc && \
     echo "source $CYCLONEDDS_HOME/setup.bash" >> /etc/bash.bashrc
