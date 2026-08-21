@@ -55,7 +55,13 @@ RUN echo "echo 'Setup unitree ros2 environment'" >> /etc/bash.bashrc && \
     echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /etc/bash.bashrc && \
     echo "source /root/unitree_ros2/cyclonedds_ws/install/setup.bash" >> /etc/bash.bashrc
 
-# The network interface is set in config/cyclonedds.xml, mounted at /config
+# 5. The network interface is set in config/cyclonedds.xml.
+# Baked in as a fallback so the image works unmounted; `-v .../config:/config`
+# at run time shadows this directory — see README, a mount from the wrong cwd
+# silently hides it behind an empty dir. Kept last so editing the XML does not
+# invalidate the workspace build above.
+COPY config/ /config/
+
 ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
     CYCLONEDDS_URI=/config/cyclonedds.xml
 

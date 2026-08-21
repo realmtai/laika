@@ -23,9 +23,9 @@ with `ip a`:
 
 The `config/` directory is mounted into the container at `/config`, and
 `CYCLONEDDS_URI` already points at `/config/cyclonedds.xml`, so changes take
-effect on the next `docker run` without a rebuild. `Dockerfile.go2` also bakes a
-copy of `config/` into the image at `/config`, so that image still works with no
-mount at all; `arcs-ros2` has no fallback and needs the mount.
+effect on the next `docker run` without a rebuild. Both Dockerfiles also bake a
+copy of `config/` into the image at `/config`, so an image still works unmounted
+— at whatever interface was current when it was built.
 
 ### When `/config` comes up empty
 
@@ -33,8 +33,11 @@ mount at all; `arcs-ros2` has no fallback and needs the mount.
 is relative to your shell's cwd, and if `$(pwd)/config` does not exist on the
 host, Docker does not error — it *creates* an empty directory there and mounts
 that. The empty mount then shadows the baked-in `/config`, so the container ends
-up with a `/config` that exists but holds no `cyclonedds.xml`, and DDS falls back
-to default discovery on the wrong interface.
+up with a `/config` that exists but holds no `cyclonedds.xml`. `CYCLONEDDS_URI`
+then points at a file that is not there and your interface selection is never
+applied — expect either a config error out of `dds_create_participant` or a
+participant that comes up on some other interface. Either way the robot's topics
+never show up in `ros2 topic list`.
 
 Running from the repo root is the usual way to hit this — there is no `config/`
 up there, so you get a silent empty mount plus a stray `config/` directory left
