@@ -4,9 +4,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 
+# `source` is a bash builtin, needed by the workspace build below
 SHELL ["/bin/bash", "-c"]
-
-COPY config/ ./config/
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Unitree ROS2 Package \
@@ -40,17 +39,26 @@ RUN mkdir -p /opt/unitree && \
     git clone https://github.com/unitreerobotics/unitree_sdk2.git        /opt/unitree/unitree_sdk2 && \
     git clone https://github.com/unitreerobotics/unitree_ros2.git        /opt/unitree/unitree_ros2
 
-RUN mkdir -p /root/unitree_ros2/cyclonedds_ws/src && \
-    cd /root/unitree_ros2/cyclonedds_ws/src && \
+# The workspace lives *inside* the unitree_ros2 clone: its cyclonedds_ws/src
+# already holds the unitree_go / unitree_api / unitree_hg message packages, and
+# rmw_cyclonedds + cyclonedds get cloned in next to them. Building anywhere else
+# produces a CycloneDDS workspace with no Unitree messages in it.
+# https://github.com/unitreerobotics/unitree_ros2/blob/master/README.md
+ENV UNITREE_ROS2_WS=/opt/unitree/unitree_ros2/cyclonedds_ws
+
+RUN cd ${UNITREE_ROS2_WS}/src && \
     git clone https://github.com/ros2/rmw_cyclonedds -b foxy && \
     git clone https://github.com/eclipse-cyclonedds/cyclonedds -b releases/0.10.x && \
     cd .. && \
     export LD_LIBRARY_PATH=/opt/ros/foxy/lib && \
-    colcon build --packages-select cyclonedds
-    source /opt/ros/foxy/setup.bash
+    colcon build --packages-select cyclonedds && \
+    source /opt/ros/foxy/setup.bash && \
     colcon build
 
-ENV CYCLONEDDS_HOME=/root/unitree_ros2/cyclonedds_ws/install
+# CMake package root for CycloneDDS, used by unitree_sdk2 and unitree_sdk2_python.
+# colcon installs each package under install/<pkg>, so this is not the workspace
+# root — sourcing the workspace is a separate thing, done in /etc/bash.bashrc.
+ENV CYCLONEDDS_HOME=${UNITREE_ROS2_WS}/install/cyclonedds
 
 RUN cmake -S /opt/unitree/unitree_sdk2 \
           -B /opt/unitree/unitree_sdk2/build \
@@ -59,12 +67,16 @@ RUN cmake -S /opt/unitree/unitree_sdk2 \
     cmake --install /opt/unitree/unitree_sdk2/build
 
 # Running into issues with this, commenting it out for now and it can be ran manually in the container
-# RUN source $CYCLONEDDS_HOME/setup.bash && \
-#   source /opt/ros/foxy/setup.bash && \
+# RUN source ${UNITREE_ROS2_WS}/install/setup.bash && \
 #   pip3 install -e /opt/unitree/unitree_sdk2_python
 
 RUN echo "source /opt/ros/foxy/setup.bash" >> /etc/bash.bashrc && \
-    echo "source $CYCLONEDDS_HOME/setup.bash" >> /etc/bash.bashrc
+    echo "source ${UNITREE_ROS2_WS}/install/setup.bash" >> /etc/bash.bashrc
+
+# Baked-in fallback so the image works unmounted. `-v .../config:/config` at run
+# time shadows this directory — see README, a mount from the wrong cwd silently
+# hides it behind an empty dir.
+COPY config/ /config/
 
 ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ENV CYCLONEDDS_URI=/config/cyclonedds.xml
